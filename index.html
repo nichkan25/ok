@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE 15 REALMS - Ultimate Science RPG (Nature & Timed Edition)</title>
+<!-- ลิงก์ไปยัง Manifest และกำหนด Theme Color -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00f0ff">
+<link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        :root {
+            --neon-green: #00ff66;
+            --neon-amber: #ffb703;
+            --neon-cyan: #00f0ff;
+            --neon-red: #ff0055;
+            --neon-purple: #b5179e;
+            --panel-bg: rgba(10, 15, 30, 0.92);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%; margin: 0; padding: 0;
+            background-color: #050a12; color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none; overflow: hidden;
+        }
+
+        #game-container {
+            width: 100vw; height: 100vh; position: relative;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        #anime-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center; background-repeat: no-repeat;
+            transition: background-image 0.5s ease-in-out;
+            filter: brightness(0.65) contrast(1.1); z-index: 1; opacity: 1;
+        }
+
+        #particle-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2; pointer-events: none;
+        }
+
+        .shake { animation: shakeEffect 0.4s ease-in-out; }
+        @keyframes shakeEffect {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 5px); }
+            40% { transform: translate(8px, -5px); }
+            60% { transform: translate(-5px, 3px); }
+            80% { transform: translate(5px, -3px); }
+        }
+
+        .flash-correct { animation: flashGreen 0.5s ease-out; }
+        @keyframes flashGreen {
+            0% { box-shadow: inset 0 0 50px var(--neon-green); }
+            100% { box-shadow: inset 0 0 0px transparent; }
+        }
+
+        .flash-wrong { animation: flashRed 0.5s ease-out; }
+        @keyframes flashRed {
+            0% { box-shadow: inset 0 0 50px var(--neon-red); }
+            100% { box-shadow: inset 0 0 0px transparent; }
+        }
+
+        header {
+            padding: 8px 15px; background: rgba(2, 6, 12, 0.92);
+            border-bottom: 2px solid var(--neon-cyan);
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: monospace; font-size: 0.85rem; z-index: 10; height: 50px; flex-shrink: 0;
+            backdrop-filter: blur(5px);
+        }
+
+        .hud-val { color: var(--neon-cyan); font-weight: bold; text-shadow: 0 0 8px var(--neon-cyan); }
+        .hud-timer { color: var(--neon-amber); font-weight: bold; font-size: 1rem; text-shadow: 0 0 8px var(--neon-amber); }
+        .hud-timer.warning { color: var(--neon-red); animation: pulseTimer 0.5s infinite alternate; }
+
+        @keyframes pulseTimer {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.15); }
+        }
+
+        #ui-layer {
+            position: relative; z-index: 5; flex: 1;
+            display: flex; flex-direction: column;
+            padding: 15px; height: calc(100vh - 50px); overflow-y: auto;
+        }
+
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 850px; margin: 0 auto; }
+        .screen.active { display: flex; }
+
+        .card-panel {
+            background: var(--panel-bg); border: 2px solid var(--neon-cyan);
+            border-radius: 12px; padding: 18px; width: 100%; text-align: center;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.2); margin-bottom: 12px;
+            backdrop-filter: blur(10px); transition: all 0.3s;
+        }
+
+        .mascot-container {
+            display: flex; align-items: center; justify-content: center;
+            gap: 12px; background: rgba(0,0,0,0.4); border-radius: 10px;
+            padding: 8px 15px; margin-bottom: 12px; border: 1px solid rgba(0,240,255,0.3);
+        }
+        .mascot-avatar {
+            font-size: 2.8rem; filter: drop-shadow(0 0 10px var(--neon-amber));
+            animation: bounceMascot 2s infinite ease-in-out;
+        }
+        @keyframes bounceMascot {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .mascot-info { text-align: left; }
+        .mascot-name { color: var(--neon-amber); font-weight: bold; font-size: 0.95rem; }
+        .mascot-quote { color: #ddd; font-size: 0.82rem; font-style: italic; }
+
+        .timer-bar-bg {
+            width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+            border-radius: 4px; overflow: hidden; margin-bottom: 12px; border: 1px solid rgba(0,240,255,0.2);
+        }
+        .timer-bar-fill {
+            height: 100%; width: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-amber), var(--neon-red));
+            transition: width 1s linear;
+        }
+
+        .btn-main {
+            background: linear-gradient(135deg, #00f0ff, #006699);
+            border: none; color: #fff; padding: 12px 24px; font-size: 0.95rem;
+            font-weight: 900; text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+            transition: 0.2s; margin: 5px;
+        }
+        .btn-main:hover { transform: scale(1.05); box-shadow: 0 0 25px var(--neon-cyan); }
+
+        .btn-secondary {
+            background: rgba(255, 183, 3, 0.2); border: 1px solid var(--neon-amber);
+            color: var(--neon-amber); padding: 8px 14px; font-weight: bold;
+            border-radius: 6px; cursor: pointer; transition: 0.2s; margin: 3px; font-size: 0.85rem;
+        }
+        .btn-secondary:hover { background: var(--neon-amber); color: #000; box-shadow: 0 0 12px var(--neon-amber); }
+
+        .btn-home {
+            background: rgba(255, 0, 85, 0.3); border: 1px solid var(--neon-red);
+            color: #fff; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8rem;
+        }
+        .btn-home:hover { background: var(--neon-red); box-shadow: 0 0 10px var(--neon-red); }
+
+        .realm-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px; width: 100%; margin-top: 10px; max-height: 250px; overflow-y: auto; padding: 5px;
+        }
+        .realm-btn {
+            background: rgba(15, 25, 45, 0.85); border: 1px solid var(--neon-cyan);
+            color: #fff; padding: 10px; border-radius: 8px; cursor: pointer;
+            font-size: 0.8rem; text-align: center; font-weight: bold; transition: 0.2s;
+        }
+        .realm-btn:hover { border-color: var(--neon-amber); background: rgba(0, 240, 255, 0.3); transform: scale(1.05); }
+
+        .grid-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; width: 100%; }
+        .choice-btn {
+            background: rgba(10, 20, 35, 0.9); border: 1px solid var(--neon-cyan);
+            color: #fff; padding: 14px; font-size: 0.88rem; font-weight: bold;
+            border-radius: 8px; cursor: pointer; text-align: center; line-height: 1.3; transition: 0.2s;
+        }
+        .choice-btn:hover { background: var(--neon-cyan); color: #000; transform: scale(1.03); box-shadow: 0 0 15px var(--neon-cyan); }
+
+        .modal {
+            display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8); backdrop-filter: blur(5px); justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: var(--panel-bg); border: 2px solid var(--neon-cyan); border-radius: 12px;
+            padding: 20px; max-width: 500px; width: 90%; text-align: left; box-shadow: 0 0 30px var(--neon-cyan);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-cyan); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="anime-bg"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <header>
+        <button class="btn-home" onclick="AudioFX.playClick(); Game.returnToMenu();">🏠 กลับหน้าหลัก</button>
+        <div>REALM: <span id="hud-land" class="hud-val">01 / 15</span></div>
+        <div>PROGRESS: <span id="hud-qnum" class="hud-val">ข้อ 1/15</span></div>
+        <div>⏳ <span id="hud-timer" class="hud-timer">15s</span></div>
+        <div>HP: <span id="hud-hp" class="hud-val">❤️❤️❤️</span></div>
+        <div>SCORE: <span id="hud-score" class="hud-val">0</span></div>
+    </header>
+
+    <div id="ui-layer">
+        
+        <!-- 1. เมนูหลัก -->
+        <div id="screen-menu" class="screen active">
+            <div class="card-panel">
+                <h1 style="font-size: 2rem; color: var(--neon-cyan); text-shadow: 0 0 20px var(--neon-cyan); margin: 0 0 5px 0;">
+                    🌿 15 REALMS SCIENCE RPG 🦁
+                </h1>
+                <p style="color: #ddd; font-size: 0.9rem; margin-bottom: 15px;">
+                    คลังข้อสอบ 1,500 ข้อ | ผจญภัยธรรมชาติกับเหล่าผู้ช่วยสัตว์ป่าสุดป่วน! ⏱️ จับเวลาข้อละ 15 วินาที!
+                </p>
+
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
+                    <button class="btn-main" onclick="AudioFX.init(); AudioFX.playClick(); Game.startAtLand(0)">🚀 เริ่มผจญภัยดินแดนที่ 1</button>
+                    <button class="btn-secondary" onclick="AudioFX.init(); AudioFX.playClick(); MenuNav.openHowToPlay()">📖 วิธีการเล่น</button>
+                    <button class="btn-secondary" onclick="AudioFX.init(); AudioFX.playClick(); MenuNav.toggleAudio()" id="btn-audio">🔊 เสียงพากย์เล่าเรื่อง: เปิด</button>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <h3 style="color: var(--neon-amber); margin: 0 0 8px 0; font-size: 0.95rem;">🗺️ เลือกด่านผจญภัย (1-15)</h3>
+                <div id="realm-grid" class="realm-grid"></div>
+            </div>
+        </div>
+
+        <!-- 2. ฉากเล่าเรื่องโดย AI -->
+        <div id="screen-story" class="screen">
+            <div class="card-panel" style="text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">
+                    <span id="story-chapter-title" style="color: var(--neon-amber); font-weight: bold; font-size: 0.95rem;">📖 บทที่ 1: การเริ่มต้นผจญภัย</span>
+                    <span id="text-counter" style="color: var(--neon-cyan); font-weight: bold; font-size: 0.8rem;">1/3</span>
+                </div>
+                
+                <div id="mascot-box-story" class="mascot-container" style="margin-top: 10px;">
+                    <div id="mascot-icon-story" class="mascot-avatar">🐜</div>
+                    <div class="mascot-info">
+                        <div id="mascot-name-story" class="mascot-name">พี่ยักษ์มดแดง</div>
+                        <div id="mascot-quote-story" class="mascot-quote">"ระวังกรดฟอร์มิกด้วยล่ะไอ้น้อง!"</div>
+                    </div>
+                </div>
+
+                <span id="realm-info-tag" style="color: var(--neon-green); font-size: 0.85rem; font-weight: bold; display: block; margin-top: 6px;"></span>
+                <p id="subtitle" style="color: #fff; font-size: 0.95rem; line-height: 1.6; min-height: 65px; margin-top: 8px;"></p>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+                    <button class="btn-secondary" onclick="AudioFX.playClick(); Cutscene.nextText()" id="btn-skip-text">ถัดไป ⏩</button>
+                    <button class="btn-main" onclick="AudioFX.playClick(); Cutscene.finishStory()" id="btn-start-quest" style="display: none; padding: 8px 18px; font-size: 0.85rem;">ลุยการทดสอบต่อ! ⚔️</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ฉากทำข้อสอบ -->
+        <div id="screen-quiz" class="screen">
+            <div class="card-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span id="quiz-land-title" style="color: var(--neon-amber); font-size: 0.85rem; font-weight: bold;"></span>
+                    <span id="quiz-badge" style="color: var(--neon-green); font-size: 0.8rem; font-weight: bold;"></span>
+                </div>
+                
+                <div id="mascot-box-quiz" class="mascot-container">
+                    <div id="mascot-icon-quiz" class="mascot-avatar">🦁</div>
+                    <div class="mascot-info">
+                        <div id="mascot-name-quiz" class="mascot-name">เจ้าป่าไลออน</div>
+                        <div id="mascot-quote-quiz" class="mascot-quote">"ข้อนี้กล้วยๆ รีบตอบก่อนหมดเวลานะ!"</div>
+                    </div>
+                </div>
+
+                <div class="timer-bar-bg"><div id="timer-bar-fill" class="timer-bar-fill"></div></div>
+
+                <h3 id="quiz-question" style="font-size: 0.98rem; color: #fff; line-height: 1.5; margin: 10px 0 15px 0; text-align: left;"></h3>
+
+                <div id="quiz-choice-box" class="grid-choices"></div>
+            </div>
+        </div>
+
+        <!-- 4. ฉากกิจกรรมสุดป่วน -->
+        <div id="screen-event" class="screen">
+            <div class="card-panel">
+                <div id="event-icon" style="font-size: 3rem; margin-bottom: 5px;">🤪</div>
+                <h2 id="event-title" style="color: var(--neon-amber); font-size: 1.3rem; margin-top: 0;"></h2>
+                <p id="event-desc" style="font-size: 0.95rem; color: #ddd; line-height: 1.6; margin: 15px 0;"></p>
+                <div id="event-action-box" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;"></div>
+            </div>
+        </div>
+
+        <!-- 5. ฉากมินิเกมกู้ชีพสุดกวน -->
+        <div id="screen-revive" class="screen">
+            <div class="card-panel">
+                <h1 style="color: var(--neon-red); font-size: 1.6rem; margin: 0 0 8px 0;">🤪 หัวใจหมดสลบไสลด์!</h1>
+                <p style="color: #fff; font-size: 0.9rem;">รัวปุ่ม "ตบหน้าตัวเองเรียกสติ" 5 ครั้งรวดเพื่อตื่นขึ้นมาสู้ต่อ (ชุบชีวิตได้ 1 ครั้ง/เกม)!</p>
+                <div id="revive-action" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <!-- 6. หน้าสรุปผลการเล่น -->
+        <div id="screen-result" class="screen">
+            <div class="card-panel">
+                <h1 id="result-title" style="font-size: 1.8rem; margin-bottom: 10px;">MISSION COMPLETE! 🎉</h1>
+                <p style="font-size: 0.9rem;">สถานะ: <span id="result-status" style="color: var(--neon-cyan); font-weight: bold;"></span></p>
+                <p style="color: #aaa; margin-bottom: 15px;">คะแนนรวม: <span id="result-score" style="color: var(--neon-amber); font-weight:bold; font-size:1.2rem;">0</span></p>
+                <button class="btn-main" onclick="AudioFX.playClick(); Game.returnToMenu()">กลับสู่หน้าหลัก 🏠</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal หน้าวิธีการเล่น -->
+<div id="how-to-play-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="color: var(--neon-cyan); margin-top: 0; text-align: center;">📖 วิธีการเล่น</h2>
+        <ul style="line-height: 1.6; font-size: 0.9rem; color: #ddd; padding-left: 20px;">
+            <li><b>เป้าหมาย:</b> พิชิตดินแดนวิทยาศาสตร์ธรรมชาติให้ครบทั้ง 15 ดินแดน</li>
+            <li><b>ระบบเวลา:</b> มีเวลาทำข้อสอบ <b>15 วินาทีต่อข้อ</b> หากหมดเวลาจะถือว่าตอบผิดทันที!</li>
+            <li><b>ตัวละครผู้ช่วย:</b> มีสัตว์ป่าประจำแต่ละดินแดนคอยต้อนรับและให้กำลังใจ</li>
+            <li><b>ตอบถูก:</b> ได้รับคะแนน +200 และมีโอกาสสุ่มพบเหตุการณ์กวนๆ!</li>
+            <li><b>ตอบผิด / หมดเวลา:</b> เสียพลังชีวิต (HP) 1 ดวง</li>
+            <li><b>การฟื้นคืนชีพ:</b> หาก HP หมด รัวปุ่มตบหน้าเรียกสติเพื่อฟื้นคืนชีพได้ 1 ครั้งต่อเกม</li>
+        </ul>
+        <div style="text-align: center; margin-top: 15px;">
+            <button class="btn-main" onclick="MenuNav.closeHowToPlay()">เข้าสู่เกม!</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const bgImages = {
+    menu: "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=80",
+    realms: [
+        "https://images.unsplash.com/photo-1511497584788-876761c11969?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1507499739999-097706ad8914?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1518098268026-4e89f1a2cd8e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    ]
+};
+
+function setBgImage(url) {
+    const bgElement = document.getElementById('anime-bg');
+    if (bgElement) bgElement.style.backgroundImage = `url('${url}')`;
+}
+
+const AudioFX = {
+    ctx: null,
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    playClick() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.05);
+    },
+    playCorrect() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(783.99, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.35);
+    },
+    playWrong() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(110, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.35);
+    }
+};
+
+function speakLively(text) {
+    if (!MenuNav.audioEnabled || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'th-TH'; utter.pitch = 1.2; utter.rate = 1.1;
+    window.speechSynthesis.speak(utter);
+}
+
+function triggerScreenShake() {
+    const gc = document.getElementById('game-container');
+    gc.classList.remove('shake'); void gc.offsetWidth; gc.classList.add('shake');
+}
+
+function triggerFlash(type) {
+    const gc = document.getElementById('game-container');
+    const className = type === 'correct' ? 'flash-correct' : 'flash-wrong';
+    gc.classList.remove(className); void gc.offsetWidth; gc.classList.add(className);
+}
+
+const uniqueRealms = [
+    {
+        name: "ดินแดนที่ 1: ป่ามดพิษกรดฟอร์มิก", topic: "กรด-เบส",
+        mascot: { icon: "🐜", name: "จ่ามดแดงจอมขยัน", quote: "ระวังอย่าเดินเหยียบกรดฟอร์มิกของพวกเรานะ!" },
+        chapters: [
+            { title: "บทที่ 1: ก้าวแรกสู่ป่ามดพิษ", story: "ละอองกรดฟอร์มิกสีฟ้าระยิบระยับลอยละล่อง ฝูงมดพิษยักษ์กำลังจับจ้องคุณอยู่!", knowledge: "กรดฟอร์มิกสะเทินได้ด้วยเบสอ่อน เช่น น้ำสบู่!", warning: "อย่าใช้น้ำกรดเข้มข้นมาล้างพิษเด็ดขาด!" },
+            { title: "บทที่ 2: ไขปริศนาค่า pH", story: "เอไอตรวจพบว่าความเข้มข้นของกรดในดินกำลังเพิ่มสูงขึ้น!", knowledge: "สารที่มีค่า pH ต่ำกว่า 7 จะมีฤทธิ์เป็นกรด ยิ่งpHต่ำยิ่งเป็นกรดแก่!", warning: "ตรวจสอบค่า pH ของสารเคมีก่อนเดินลุย!" },
+            { title: "บทที่ 3: กระดาษทดสอบอินดิเคเตอร์", story: "คุณพบกล่องเครื่องมือวิทยาศาสตร์ตกอยู่กลางพงหญ้า!", knowledge: "กระดาษลิตมัสสีน้ำเงินจะเปลี่ยนเป็นสีแดงเมื่อสัมผัสกรด!", warning: "ระวังอย่าให้มือเปล่าสัมผัสกรดโดยตรง!" },
+            { title: "บทที่ 4: สารสะเทินในชีวิตประจำวัน", story: "ฝูงมดปล่อยละอองกรดปิดทางเข้าถ้ำ!", knowledge: "เบสอ่อนๆ เช่น เบกกิ้งโซดา ช่วยลดความรุนแรงของกรดได้อย่างปลอดภัย!", warning: "หลีกเลี่ยงการผสมสารเคมีโดยไม่มีความรู้!" },
+            { title: "บทที่ 5: ประตูรังมดพิษโบราณ", story: "คุณเดินทางมาถึงใจกลางป่ามดพิษ ด่านสุดท้ายก่อนข้ามดินแดน!", knowledge: "ปฏิกิริยาสะเทินจะ ได้ผลิตภัณฑ์เป็นเกลือกับน้ำเสมอ!", warning: "เตรียมตัวรับมือข้อสอบมหาบอส!" }
+        ]
+    },
+    {
+        name: "ดินแดนที่ 2: หุบเขาโคลนอัลคาไล", topic: "โลหะอัลคาไล",
+        mascot: { icon: "🦛", name: "พี่ฮิปโปสลอธ", quote: "อย่าสาดน้ำลงโคลนโซเดียมนะ เดี๋ยวมันตู้มต้าม!" },
+        chapters: [
+            { title: "บทที่ 1: หุบเขาโลหะไวไฟ", story: "โคลนชื้นแฉะอุดมไปด้วยแร่โซเดียมและโพแทสเซียมพร้อมทำปฏิกิริยา!", knowledge: "โลหะหมู่ 1A ทำปฏิกิริยากับน้ำรุนแรงเกิดแก๊สไฮโดรเจนติดไฟ!", warning: "ห้ามเทน้ำสาดลงบนบ่อโคลนที่มีก้อนโลหะเด็ดขาด!" },
+            { title: "บทที่ 2: การเก็บรักษาโลหะอัลคาไล", story: "เอไอพบก้อนโลหะโซเดียมบริสุทธิ์วางอยู่ริมธารน้ำ!", knowledge: "ต้องเก็บโลหะหมู่ 1A ไว้ในน้ำมันก๊าดเพื่อป้องกันปฏิกิริยากับน้ำและอากาศ!", warning: "อย่าจับก้อนโซเดียมด้วยมือที่เปียกชื้น!" },
+            { title: "บทที่ 3: เปลวไฟสีสันแปลกตา", story: "ประกายไฟสีเหลืองและม่วงลุกโชนขึ้นมาจากพื้นดิน!", knowledge: "การเผาโลหะอัลคาไลจะให้สีเปลวไฟเฉพาะตัว เช่น โซเดียมให้สีเหลือง!", warning: "สวมแว่นตานิรภัยขณะมองเปลวไฟ!" },
+            { title: "บทที่ 4: ความหนาแน่นเบากว่าน้ำ", story: "ก้อนโลหะลอยขึ้นมาเหนือบ่อโคลนอย่างน่าอัศจรรย์!", knowledge: "โลหะอัลคาไลมีความหนาแน่นต่ำ สามารถลอยน้ำได้!", warning: "ระวังการระเบิดจากแก๊สไฮโดรเจนสะสม!" },
+            { title: "บทที่ 5: ทางออกหุบเขาโคลน", story: "แม่น้ำโคลนเดือดปุดๆ ขวางทางไปดินแดนถัดไป!", knowledge: "ใช้ความรู้เรื่องเวเลนซ์อิเล็กตรอน 1 ตัวของหมู่ 1A เพื่อผ่านทาง!", warning: "เตรียมตอบคำถามมหาบอส!" }
+        ]
+    },
+    { name: "ดินแดนที่ 3: ถ้ำแก๊สไข่เน่าไฮโดรเจนซัลไฟด์", topic: "แก๊สพิษ", mascot: { icon: "🦇", name: "ค้างคาวแม่ไก่เจ้าปัญญา", quote: "บินสูงเข้าไว้! แก๊สไข่เน่าชอบสะสมก้นถ้ำ!" }, chapters: [{ title: "บทที่ 1: กลิ่นรุนแรงใต้ปฐพี", story: "กลิ่นแก๊ส H2S ลอยต่ำขัดขวางการหายใจ!", knowledge: "แก๊ส H2S หนักกว่าอากาศจึงสะสมในที่ต่ำ!", warning: "ห้ามหมอบต่ำบนพื้นถ้ำ!" }] },
+    { name: "ดินแดนที่ 4: ทะเลทรายกรดกำมะถัน", topic: "กรดเคมี", mascot: { icon: "🐪", name: "อูฐทะเลทรายสวมแว่น", quote: "จิบน้ำอุ่นให้สบายใจ แต่อย่าเทน้ำลงกรดนะ!" }, chapters: [{ title: "บทที่ 1: ทะเลทรายแห่งการกัดกร่อน", story: "แอ่งน้ำคือกรดซัลฟิวริกเข้มข้น!", knowledge: "การเจือจางกรดเข้มข้น ต้องค่อยๆ เทกรดลงในน้ำ!", warning: "ห้ามเทน้ำลงในกรดโดยตรงเด็ดขาด!" }] },
+    { name: "ดินแดนที่ 5: ภูเขาไฟแร่รัตนชาติ", topic: "ความร้อนและแร่ธาตุ", mascot: { icon: "🦁", name: "สิงโตเพลิงขนนุ่ม", quote: "คำรามรับความร้อน! ผลึกแร่แท้ต้องอดทนแรงอัด!" }, chapters: [{ title: "บทที่ 1: สายธารลาวาปะทุ", story: "ผลึกแร่ความร้อนสูงปลิวว่อนไปทั่วท้องฟ้า!", knowledge: "หินที่เย็นตัวอย่างรวดเร็วบนพื้นผิวจะสร้างผลึกเนื้อละเอียด!", warning: "อย่าสัมผัสผลึกหินร้อนโดยตรง!" }] },
+    { name: "ดินแดนที่ 6: บึงน้ำเน่าจุลินทรีย์ไร้อากาศ", topic: "แก๊สชีวภาพ", mascot: { icon: "🐊", name: "ชาละวันปากหวาน", quote: "มีเทนตู้มต้าม! ระวังอย่าจุดไฟใกล้บึงนะจ๊ะ" }, chapters: [{ title: "บทที่ 1: ฟองแก๊สชีวภาพปุดขึ้นมา", story: "แก๊สมีเทนจากการย่อยสลายลอยคลุ้งเหนือผิวน้ำ!", knowledge: "แก๊สมีเทนเกิดจากการย่อยสลายของแบคทีเรียไร้อากาศ!", warning: "ห้ามจุดประกายไฟใกล้บึงน้ำเน่า!" }] },
+    { name: "ดินแดนที่ 7: ยอดเขาน้ำแข็งเยือกแข็ง", topic: "อุณหภูมิและฉนวน", mascot: { icon: "🐻", name: "หมีขาวขั้วโลกจอมตะกละ", quote: "ฮัดเช้ย! โรยเกลือช่วยให้น้ำแข็งละลายไวนะ!" }, chapters: [{ title: "บทที่ 1: พายุหิมะพัดกระหน่ำ", story: "อุณหภูมิลดต่ำลงอย่างรวดเร็วจนเป็นอัมพาต!", knowledge: "การโปรยเกลือลงบนน้ำแข็งช่วยลดจุดแช่แข็งของน้ำได้!", warning: "อย่าดื่มน้ำแข็งโดยตรง!" }] },
+    { name: "ดินแดนที่ 8: ป่าเห็ดเรืองแสง", topic: "ชีวเคมี", mascot: { icon: "🦉", name: "นกฮูกตาโตเรืองแสง", quote: "ฮูกๆ! สารลูซิเฟอรินในเห็ดเปล่งประกายในความมืด!" }, chapters: [{ title: "บทที่ 1: ละอองสปอร์เรืองแสง", story: "เห็ดปล่อยสารเคมีเรืองแสงระยิบระยับ!", knowledge: "การเรืองแสงทางชีวภาพเกิดจากปฏิกิริยาของลูซิเฟอริน!", warning: "ละอองสปอร์บางชนิดอาจมีพิษ!" }] },
+    { name: "ดินแดนที่ 9: ซากเมืองกัมมันตรังสี", topic: "นิวเคลียร์", mascot: { icon: "🐺", name: "หมาป่าตะกั่วหุ้มเกราะ", quote: "โฮ้ง! เดินชิดกำแพงตะกั่วไว้ รังสีแกมมาเจาะไม่เข้า!" }, chapters: [{ title: "บทที่ 1: เมืองร้างปนเปื้อนรังสี", story: "เครื่องไกเกอร์มุลเลอร์ดังเตือนระดับรังสีสูง!", knowledge: "แผ่นตะกั่วหนาช่วยบดบังรังสีแกมมาได้ดีที่สุด!", warning: "ห้ามสูดดมฝุ่นควันปนเปื้อนรังสี!" }] },
+    { name: "ดินแดนที่ 10: เกาะพายุไฟฟ้าสถิต", topic: "ไฟฟ้าสถิต", mascot: { icon: "🦅", name: "พญาอินทรีสายฟ้า", quote: "เปรี้ยง! หลบในกรงฟาราเดย์ปลอดภัยจากสายฟ้าชัวร์!" }, chapters: [{ title: "บทที่ 1: ประจุไฟฟ้าสะสมในก้อนเมฆ", story: "สายฟ้าผ่าลงสู่จุดสูงที่สุดบนเกาะตลอดเวลา!", knowledge: "กรงฟาราเดย์ช่วยป้องกันอันตรายจากฟ้าผ่าได้!", warning: "อย่ายืนใต้ต้นไม้สูงใหญ่กลางพายุ!" }] },
+    { name: "ดินแดนที่ 11: หุบเขาเบาบางไร้ออกซิเจน", topic: "ระบบหายใจ", mascot: { icon: "🐐", name: "แพะภูเขาปอดเหล็ก", quote: "แบ้! อากาศข้างบนน้อย ค่อยๆ เดินหายใจลึกๆ" }, chapters: [{ title: "บทที่ 1: ความกดอากาศต่ำลง", story: "ระดับออกซิเจนเจือจางจนเริ่มหน้ามืด!", knowledge: "ออกซิเจนจำเป็นต่อการสร้างพลังงาน ATP ในเซลล์!", warning: "การออกแรงเร่งรีบจะทำให้ขาดออกซิเจนเฉียบพลัน!" }] },
+    { name: "ดินแดนที่ 12: เขาวงกตหินปูนและน้ำถ้ำ", topic: "สารประกอบคาร์บอเนต", mascot: { icon: "🐢", name: "พญาเต่าหินปูน", quote: "ก๊อกๆ หินงอกหินย้อยโตทีละนิดจากคาร์บอเนต!" }, chapters: [{ title: "บทที่ 1: ถ้ำหินงอกหินย้อย", story: "น้ำกรดคาร์บอนิกละลายหินปูนทีละหยดอย่างช้าๆ!", knowledge: "แคลเซียมคาร์บอเนตทำปฏิกิริยากับกรดเกิดแก๊ส CO2!", warning: "อย่าอยู่ในห้องถ้ำปิดที่มี CO2 สะสม!" }] },
+    { name: "ดินแดนที่ 13: ทุ่งหญ้าสารเคมีกำจัดศัตรูพืช", topic: "นิเวศวิทยา", mascot: { icon: "🦊", name: "จิ้งจอกเก้าหางพุ่มไม้", quote: "ระวังสารพิษสะสมตามโซ่อาหารนะมนุษย์!" }, chapters: [{ title: "บทที่ 1: พื้นที่ปนเปื้อนโลหะหนัก", story: "สารพิษตกค้างส่งผลกระทบต่อห่วงโซ่อาหาร!", knowledge: "สารพิษจะเพิ่มความเข้มข้นขึ้นตามลำดับขั้นการกิน!", warning: "ห้ามกินพืชหรือสัตว์ในพื้นที่ปนเปื้อน!" }] },
+    { name: "ดินแดนที่ 14: ถ้ำโคลนด่างฟอสฟอรัส", topic: "สารเคมีติดไฟ", mascot: { icon: "🐗", name: "หมูป่าเพลิงฟอสฟอรัส", quote: "อู๊ดๆ! ฟอสฟอรัสขาวห้ามโดนอากาศ เดี๋ยวไฟลุก!" }, chapters: [{ title: "บทที่ 1: ฟอสฟอรัสขาวลุกติดไฟ", story: "แร่ฟอสฟอรัสติดไฟขึ้นเองเมื่อสัมผัสกับอากาศ!", knowledge: "ฟอสฟอรัสขาวมีจุดติดไฟต่ำมาก จึงต้องเก็บไว้ในน้ำ!", warning: "อย่าปล่อยให้ก้อนฟอสฟอรัสแห้งสัมผัสอากาศ!" }] },
+    { name: "ดินแดนที่ 15: ปราการธาตุสุดท้าย", topic: "ตารางธาตุขั้นสูง", mascot: { icon: "🐉", name: "มังกรตารางธาตุโบราณ", quote: "โฮ้ก! แสดงพลังตารางธาตุขั้นสุดยอดให้ข้าเห็นหน่อย!" }, chapters: [{ title: "บทที่ 1: มหาบอสแห่งองค์ประกอบธาตุ", story: "สนามพลังตารางธาตุปะทุขึ้นด้วยพลังงานมหาศาล!", knowledge: "ตารางธาตุจัดกลุ่มธาตุตามเลขอะตอม!", warning: "ใช้ความรู้ทั้งหมดที่คุณเรียนรู้มาเพื่อเอาชนะ!" }] }
+];
+
+function generate100QuestionsForRealm(realmIdx) {
+    const realm = uniqueRealms[realmIdx] || uniqueRealms[0];
+    const topic = realm.topic;
+    const questions = [];
+
+    const baseTemplates = [
+        { q: `สารในเรื่อง [topic] ชนิดใดที่มีคุณสมบัติเป็นกลางทางเคมีมากที่สุด?`, c: ["น้ำบริสุทธิ์ (pH 7)", "สารละลายกรดแก่", "สารละลายเบสแก่", "สารประกอบติดไฟ"], a: 0 },
+        { q: `เมื่อเกิดเหตุฉุกเฉินในเรื่อง [topic] ข้อใดคือหลักการความปลอดภัยที่ถูกต้องที่สุด?`, c: ["สวมอุปกรณ์ป้องกันและอยู่ในที่ระบายอากาศดี", "สูดดมกลิ่นโดยตรงเพื่อทดสอบ", "เอามือเปล่าสัมผัสทันที", "จุดไฟเพื่อเผาทำลายสารเคมี"], a: 0 },
+        { q: `ข้อใดอธิบายปฏิกิริยาของ [topic] ได้ถูกต้องที่สุดตามหลักวิทยาศาสตร์?`, c: ["เป็นไปตามกฎอนุรักษ์มวลและพลังงาน", "มวลของสารจะหายไปอย่างสมบูรณ์", "ไม่คายหรือดูดความร้อนเลย", "เกิดขึ้นเฉพาะในสุญญากาศเท่านั้น"], a: 0 },
+        { q: `หากต้องการชะลออัตราการเกิดปฏิกิริยาเคมีของ [topic] ควรทำอย่างไร?`, c: ["ลดอุณหภูมิและความเข้มข้นของสารตั้งต้น", "เพิ่มอุณหภูมิให้สูงที่สุด", "ใส่ตัวเร่งปฏิกิริยาเพิ่ม", "เขย่าภาชนะอย่างรุนแรง"], a: 0 }
+    ];
+
+    for (let i = 1; i <= 100; i++) {
+        const tpl = baseTemplates[i % baseTemplates.length];
+        const qText = `[คลังข้อที่ ${i}/100 - ${topic}] ${tpl.q.replace('[topic]', topic)}`;
+        const choices = [...tpl.c];
+        const correctText = choices[tpl.a];
+        
+        // สับจานช้อยส์
+        const shuffledChoices = choices.sort(() => Math.random() - 0.5);
+
+        questions.push({
+            q: qText,
+            choices: shuffledChoices,
+            ans: shuffledChoices.indexOf(correctText)
+        });
+    }
+    return questions;
+}
+
+const MenuNav = {
+    audioEnabled: true,
+    initRealmGrid() {
+        const grid = document.getElementById('realm-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        uniqueRealms.forEach((land, idx) => {
+            const btn = document.createElement('div');
+            btn.className = 'realm-btn';
+            btn.innerText = `${land.mascot.icon} ดินแดนที่ ${idx + 1}\n${land.name.split(':')[1] || land.name}`;
+            btn.onclick = () => { AudioFX.playClick(); Game.startAtLand(idx); };
+            grid.appendChild(btn);
+        });
+    },
+    toggleAudio() {
+        this.audioEnabled = !this.audioEnabled;
+        document.getElementById('btn-audio').innerText = `🔊 เสียงพากย์เล่าเรื่อง: ${this.audioEnabled ? 'เปิด' : 'ปิด'}`;
+        if (!this.audioEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    },
+    openHowToPlay() {
+        document.getElementById('how-to-play-modal').style.display = 'flex';
+    },
+    closeHowToPlay() {
+        document.getElementById('how-to-play-modal').style.display = 'none';
+    }
+};
+
+const Cutscene = {
+    textQueue: [], textIndex: 0, charIndex: 0, typingTimer: null, onFinishCallback: null,
+    playChapterStory(realmData, chapterIdx, callback) {
+        Game.showScreen('screen-story');
+        const chapters = realmData.chapters || [];
+        const chData = chapters[chapterIdx % chapters.length] || chapters[0] || {
+            title: `บทที่ ${chapterIdx + 1}: ลุยต่ออย่างไม่ย่อท้อ!`,
+            story: `คุณกำลังผจญภัยลึกลงไปใน ${realmData.name}!`,
+            knowledge: `ตั้งใจทำโจทย์ให้ดีเพื่อผ่านด่าน!`,
+            warning: `ระวังโดนข้อสอบต้มจนเปื่อย!`
+        };
+
+        document.getElementById('mascot-icon-story').innerText = realmData.mascot.icon;
+        document.getElementById('mascot-name-story').innerText = realmData.mascot.name;
+        document.getElementById('mascot-quote-story').innerText = `"${realmData.mascot.quote}"`;
+
+        document.getElementById('story-chapter-title').innerText = `📖 ${chData.title}`;
+        document.getElementById('realm-info-tag').innerText = `📍 [${realmData.name}]`;
+        
+        this.textQueue = [`🚀 ${chData.story}`, `💡 ${chData.knowledge}`, `⚠️ ${chData.warning}`];
+        this.textIndex = 0; this.onFinishCallback = callback;
+        this.showCurrentText();
+    },
+    showCurrentText() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        clearInterval(this.typingTimer);
+        document.getElementById('btn-skip-text').style.display = (this.textIndex >= this.textQueue.length - 1) ? 'none' : 'inline-block';
+        document.getElementById('btn-start-quest').style.display = (this.textIndex >= this.textQueue.length - 1) ? 'inline-block' : 'none';
+        document.getElementById('text-counter').innerText = `${this.textIndex + 1}/${this.textQueue.length}`;
+        
+        const text = this.textQueue[this.textIndex];
+        document.getElementById('subtitle').innerText = "";
+        this.charIndex = 0;
+
+        speakLively(text);
+
+        this.typingTimer = setInterval(() => {
+            if (this.charIndex < text.length) {
+                document.getElementById('subtitle').innerText += text.charAt(this.charIndex);
+                this.charIndex++;
+            } else { clearInterval(this.typingTimer); }
+        }, 22);
+    },
+    nextText() { if (this.textIndex < this.textQueue.length - 1) { this.textIndex++; this.showCurrentText(); } },
+    finishStory() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        clearInterval(this.typingTimer);
+        if (this.onFinishCallback) this.onFinishCallback();
+    }
+};
+
+const Game = {
+    currentLand: 0, currentQIndex: 0, correctStreakInLand: 0, currentChapter: 0,
+    hp: 3, score: 0, hasRevived: false, realmQuestionPools: [], currentActive15Questions: [],
+    timerInterval: null, timeLeft: 15,
+
+    init() {
+        setBgImage(bgImages.menu);
+        this.buildAllQuestionBanks();
+        MenuNav.initRealmGrid();
+        initParticles();
+    },
+
+    buildAllQuestionBanks() {
+        this.realmQuestionPools = uniqueRealms.map((_, idx) => generate100QuestionsForRealm(idx));
+    },
+
+    sample15QuestionsForCurrentLand() {
+        const pool = [...this.realmQuestionPools[this.currentLand]];
+        pool.sort(() => Math.random() - 0.5);
+        this.currentActive15Questions = pool.slice(0, 15);
+    },
+
+    showScreen(id) {
+        this.stopTimer();
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    },
+
+    startAtLand(index) {
+        this.currentLand = index; this.currentQIndex = 0; this.correctStreakInLand = 0;
+        this.currentChapter = 0; this.hp = 3; this.score = index * 1000; this.hasRevived = false;
+        
+        this.sample15QuestionsForCurrentLand();
+        this.loadLandIntro();
+    },
+
+    returnToMenu() {
+        this.stopTimer();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        clearInterval(Cutscene.typingTimer);
+        setBgImage(bgImages.menu);
+        this.showScreen('screen-menu');
+    },
+
+    loadLandIntro() {
+        if (this.currentLand >= 15) { this.endGame(true); return; }
+        setBgImage(bgImages.realms[this.currentLand] || bgImages.menu);
+        this.updateHUD();
+        Cutscene.playChapterStory(uniqueRealms[this.currentLand], this.currentChapter, () => this.startQuestion());
+    },
+
+    updateHUD() {
+        document.getElementById('hud-land').innerText = `${String(this.currentLand + 1).padStart(2, '0')} / 15`;
+        document.getElementById('hud-qnum').innerText = `ข้อ ${this.currentQIndex + 1}/15`;
+        document.getElementById('hud-hp').innerText = "❤️".repeat(Math.max(0, this.hp));
+        document.getElementById('hud-score').innerText = this.score;
+    },
+
+    startTimer() {
+        this.stopTimer();
+        this.timeLeft = 15;
+        this.updateTimerDisplay();
+
+        this.timerInterval = setInterval(() => {
+            this.timeLeft--;
+            this.updateTimerDisplay();
+
+            if (this.timeLeft <= 0) {
+                this.stopTimer();
+                this.handleTimeout();
+            }
+        }, 1000);
+    },
+
+    stopTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+    },
+
+    updateTimerDisplay() {
+        const timerEl = document.getElementById('hud-timer');
+        const fillEl = document.getElementById('timer-bar-fill');
+        
+        timerEl.innerText = `${this.timeLeft}s`;
+        if (this.timeLeft <= 5) {
+            timerEl.classList.add('warning');
+        } else {
+            timerEl.classList.remove('warning');
+        }
+
+        const pct = (this.timeLeft / 15) * 100;
+        if (fillEl) fillEl.style.width = `${pct}%`;
+    },
+
+    handleTimeout() {
+        AudioFX.playWrong();
+        triggerScreenShake();
+        triggerFlash('wrong');
+
+        this.hp--;
+        this.updateHUD();
+        alert("⏰ หมดเวลา! ตอบไม่ทัน โดนลงโทษเสียหัวใจ 1 ดวง!");
+
+        if (this.hp <= 0) {
+            if (!this.hasRevived) {
+                this.triggerReviveMinigame();
+            } else {
+                alert("หัวใจหมดแล้ว! คุณพ่ายแพ้ในภารกิจนี้...");
+                this.endGame(false);
+            }
+        } else {
+            this.currentQIndex++;
+            this.startQuestion();
+        }
+    },
+
+    startQuestion() {
+        if (this.currentQIndex >= 15) {
+            alert(`🎉 ยินดีด้วย! คุณพิชิตด่าน ${this.currentLand + 1} ครบถ้วนแล้ว!`);
+            this.currentLand++; this.currentQIndex = 0; this.correctStreakInLand = 0; this.currentChapter = 0;
+            if (this.currentLand < 15) this.sample15QuestionsForCurrentLand();
+            this.loadLandIntro();
+            return;
+        }
+
+        const isBoss = (this.currentQIndex === 14);
+        this.showScreen('screen-quiz');
+        this.updateHUD();
+
+        const landData = uniqueRealms[this.currentLand];
+        const qData = this.currentActive15Questions[this.currentQIndex];
+
+        document.getElementById('mascot-icon-quiz').innerText = landData.mascot.icon;
+        document.getElementById('mascot-name-quiz').innerText = landData.mascot.name;
+        document.getElementById('mascot-quote-quiz').innerText = `"${landData.mascot.quote}"`;
+
+        document.getElementById('quiz-land-title').innerText = `📍 ${landData.name}`;
+        document.getElementById('quiz-badge').innerText = isBoss ? "⚠️ BOSS BATTLE!" : `ข้อสอบสุ่ม ${this.currentQIndex + 1}/15`;
+        document.getElementById('quiz-question').innerText = isBoss ? `⚔️ [BOSS BATTLE] ข้อสอบมหาบอสที่ 15:\n${qData.q}` : qData.q;
+
+        this.renderChoices(qData.choices, qData.ans);
+        this.startTimer();
+    },
+
+    renderChoices(choices, ansIdx) {
+        const box = document.getElementById('quiz-choice-box');
+        box.innerHTML = '';
+        choices.forEach((c, idx) => {
+            const btn = document.createElement('div');
+            btn.className = 'choice-btn';
+            btn.innerText = c;
+            btn.onclick = () => Game.checkAnswer(idx, ansIdx);
+            box.appendChild(btn);
+        });
+    },
+
+    checkAnswer(chosenIdx, ansIdx) {
+        this.stopTimer();
+        if (chosenIdx === ansIdx) {
+            AudioFX.playCorrect();
+            triggerFlash('correct');
+            this.score += 200 + (this.timeLeft * 10);
+            this.correctStreakInLand++;
+
+            if (this.correctStreakInLand > 0 && this.correctStreakInLand % 3 === 0) {
+                alert(`🌟 ยอดเยี่ยม! ตอบถูกสะสมครบ ${this.correctStreakInLand} ข้อ ปลดล็อกเนื้อเรื่องบทใหม่!`);
+                this.currentChapter++;
+                this.currentQIndex++;
+                this.loadLandIntro();
+                return;
+            }
+
+            if (Math.random() < 0.7) {
+                this.triggerFunnyEvent();
+            } else {
+                this.currentQIndex++;
+                this.startQuestion();
+            }
+        } else {
+            AudioFX.playWrong();
+            triggerScreenShake();
+            triggerFlash('wrong');
+
+            this.hp--;
+            this.updateHUD();
+            if (this.hp <= 0) {
+                if (!this.hasRevived) {
+                    this.triggerReviveMinigame();
+                } else {
+                    alert("หัวใจหมดแล้ว! คุณพ่ายแพ้ในภารกิจนี้...");
+                    this.endGame(false);
+                }
+            } else {
+                alert("ตอบผิด! โดนพลังวิทยาศาสตร์ลงโทษ เสียหัวใจ 1 ดวง!");
+                this.currentQIndex++;
+                this.startQuestion();
+            }
+        }
+    },
+
+    triggerFunnyEvent() {
+        this.showScreen('screen-event');
+        const actionBox = document.getElementById('event-action-box');
+        actionBox.innerHTML = '';
+
+        const funnyEvents = [
+            {
+                icon: "🎰",
+                title: "ตู้หมุนกาชาปองวิญญาณนักวิทยาศาสตร์!",
+                desc: "คุณเจอหม้อต้มเคมีที่มีวิญญาณไอน์สไตน์สิงอยู่! ลองหมุนกาชาเสี่ยงดวงหน่อยไหม?",
+                choices: [
+                    {
+                        txt: "🎰 หมุนกาชา (ลุ้นข้ามข้อ / หัวใจ / เกลือ)",
+                        run: () => {
+                            const rand = Math.random();
+                            if (rand < 0.3) {
+                                alert("✨ ได้รับพรจากไอน์สไตน์! วาร์ปข้ามข้อสอบถัดไปฟรีทันที!");
+                                Game.currentQIndex++;
+                            } else if (rand < 0.6) {
+                                alert("❤️ ไอน์สไตน์ใจดี มอบหัวใจให้อีก 1 ดวง!");
+                                if (Game.hp < 3) Game.hp++;
+                            } else {
+                                alert("🤮 กาชาเกลือ! โดนวิญญาณไอน์สไตน์แลบลิ้นใส่ เสียคะแนน -50 แต้ม!");
+                                Game.score = Math.max(0, Game.score - 50);
+                            }
+                        }
+                    },
+                    { txt: "🏃เดินหนีไม่สนใจ (ปลอดภัยไว้ก่อน)", run: () => { alert("คุณเดินหนีออกมาอย่างเงียบๆ..."); } }
+                ]
+            },
+            {
+                icon: "🪨",
+                title: "ก้อนหินวิทยาศาสตร์พูดได้ปากกวน!",
+                desc: "ก้อนหินข้างทางตะโกนใส่คุณ: 'เฮ้! แกน่ะ คิดว่าตัวเองฉลาดพอจะผ่านด่านนี้จริงๆ เหรอ?!'",
+                choices: [
+                    {
+                        txt: "🗣️ โต้กลับ: 'ข้าเก่งเคมีเว้ย!' (+คะแนนความมั่นหน้า)",
+                        run: () => {
+                            alert("ก้อนหินตกใจในความมั่นหน้า! มอบคะแนนให้ +200 แต้ม!");
+                            Game.score += 200;
+                        }
+                    },
+                    {
+                        txt: "🤪 เตะก้อนหินอัดผนัง!",
+                        run: () => {
+                            alert("เจ็บเท้าเปล่า! ได้คะแนนฮา +100 แต้ม!");
+                            Game.score += 100;
+                        }
+                    }
+                ]
+            }
+        ];
+
+        const evt = funnyEvents[Math.floor(Math.random() * funnyEvents.length)];
+        document.getElementById('event-icon').innerText = evt.icon;
+        document.getElementById('event-title').innerText = evt.title;
+        document.getElementById('event-desc').innerText = evt.desc;
+
+        evt.choices.forEach(ch => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-main';
+            btn.style.width = '100%';
+            btn.style.maxWidth = '400px';
+            btn.innerText = ch.txt;
+            btn.onclick = () => {
+                AudioFX.playClick();
+                ch.run();
+                Game.currentQIndex++;
+                Game.startQuestion();
+            };
+            actionBox.appendChild(btn);
+        });
+    },
+
+    triggerReviveMinigame() {
+        this.showScreen('screen-revive');
+        const box = document.getElementById('revive-action');
+        box.innerHTML = '';
+
+        let clicks = 5;
+        const btn = document.createElement('button');
+        btn.className = 'btn-main';
+        btn.style.background = 'linear-gradient(135deg, #ff0055, #ffb703)';
+        btn.innerText = `👋 ตบหน้าตัวเองเรียกสติ (${clicks})`;
+
+        btn.onclick = () => {
+            AudioFX.playClick();
+            clicks--;
+            btn.innerText = `👋 ตบหน้าตัวเองเรียกสติ (${clicks})`;
+            if (clicks <= 0) {
+                this.hp = 1;
+                this.hasRevived = true;
+                this.updateHUD();
+                alert("เพี้ยะ! สะดุ้งตื่นขึ้นมาได้สำเร็จ! สู้ต่อได้แล้ว!");
+                this.startQuestion();
+            }
+        };
+        box.appendChild(btn);
+    },
+
+    endGame(isWin) {
+        this.stopTimer();
+        this.showScreen('screen-result');
+        document.getElementById('result-title').innerText = isWin ? "MISSION COMPLETE! 🎉" : "GAME OVER! 💀";
+        document.getElementById('result-status').innerText = isWin ? "คุณพิชิตครบทั้ง 15 ดินแดนวิทยาศาสตร์สุดฮา!" : "พลังชีวิตหมดลง";
+        document.getElementById('result-score').innerText = this.score;
+        speakLively(isWin ? "สุดยอดไปเลย! คุณคือผู้พิชิตวิทยาศาสตร์ตัวจริง!" : "พยายามได้ดีมาก! มาลองแก้ตัวใหม่อีกครั้งนะ!");
+    }
+};
+
+function initParticles() {
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    });
+
+    const particles = Array.from({ length: 40 }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        size: Math.random() * 3 + 1,
+        speedY: -(Math.random() * 0.8 + 0.2),
+        opacity: Math.random() * 0.5 + 0.2
+    }));
+
+    function render() {
+        ctx.clearRect(0, 0, width, height);
+        particles.forEach(p => {
+            p.y += p.speedY;
+            if (p.y < 0) p.y = height;
+            ctx.fillStyle = `rgba(0, 240, 255, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    Game.init();
+});
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => console.log('Service Worker Registered!', reg))
+        .catch((err) => console.error('Service Worker Registration Failed!', err));
+    });
+  }
+</script>
+</body>
+</html>
